@@ -61,6 +61,17 @@ public:
         return true;
     }
 
+    // Shrinking an order keeps its place in the queue. Growing it would jump
+    // ahead of later orders unfairly, so that has to be cancel + new.
+    bool reduce(OrderId id, Qty new_qty) {
+        Order* o = lookup(id);
+        if (!o || new_qty >= o->qty) return false;
+        if (new_qty == 0) return cancel(id);
+        o->level->total -= o->qty - new_qty;
+        o->qty = new_qty;
+        return true;
+    }
+
     std::optional<Price> best_bid() { return best_of(bids_); }
     std::optional<Price> best_ask() { return best_of(asks_); }
 
