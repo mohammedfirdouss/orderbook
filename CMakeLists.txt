@@ -21,5 +21,8 @@ endif()
 add_executable(tests tests/tests.cpp)
 target_link_libraries(tests PRIVATE orderbook)
 
+add_executable(bench bench/bench.cpp)
+target_link_libraries(bench PRIVATE orderbook)
+
 enable_testing()
 add_test(NAME tests COMMAND tests)
