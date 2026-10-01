@@ -113,6 +113,14 @@ BOOK_TEST(price_priority_and_remainder_rests) {
     CHECK(b.volume_at(Side::Buy, 101) == 5);
 }
 
+BOOK_TEST(trades_at_maker_price) {
+    Book b(small_config());
+    b.add_limit(1, Side::Buy, 100, 10, ignore);
+    Recorder r;
+    b.add_limit(2, Side::Sell, 90, 4, r);
+    CHECK(r.trades.size() == 1 && r.trades[0].price == 100);
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
