@@ -147,6 +147,29 @@ BOOK_TEST(cancel_from_middle_of_queue) {
     CHECK(r.trades[0].maker == 1 && r.trades[1].maker == 3);
 }
 
+BOOK_TEST(reduce_keeps_queue_position) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    CHECK(b.reduce(1, 3));
+    CHECK(b.volume_at(Side::Sell, 100) == 13);
+    Recorder r;
+    b.add_limit(3, Side::Buy, 100, 5, r);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 1, 100, 3}));
+    CHECK(same_trade(r.trades[1], {3, 2, 100, 2}));
+}
+
+BOOK_TEST(reduce_rejects_increase_and_zero_cancels) {
+    Book b(small_config());
+    b.add_limit(1, Side::Buy, 100, 10, ignore);
+    CHECK(!b.reduce(1, 10));
+    CHECK(!b.reduce(1, 11));
+    CHECK(b.reduce(1, 0));
+    CHECK(!b.contains(1));
+    CHECK(!b.best_bid());
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
