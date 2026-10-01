@@ -185,6 +185,22 @@ BOOK_TEST(market_order_sweeps_levels) {
     CHECK(!b.best_bid());
 }
 
+BOOK_TEST(rejects_bad_input) {
+    BookConfig cfg = small_config();
+    cfg.max_orders = 2;
+    Book b(cfg);
+    CHECK(b.add_limit(1, Side::Buy, 100, 0, ignore).status == Status::InvalidQty);
+    CHECK(b.add_limit(1024, Side::Buy, 100, 1, ignore).status == Status::InvalidId);
+    CHECK(b.add_limit(1, Side::Buy, 100, 1, ignore).status == Status::Ok);
+    CHECK(b.add_limit(1, Side::Buy, 100, 1, ignore).status == Status::DuplicateId);
+    CHECK(b.add_limit(2, Side::Buy, 100, 1, ignore).status == Status::Ok);
+    CHECK(b.add_limit(3, Side::Buy, 100, 1, ignore).status == Status::BookFull);
+    CHECK(b.order_count() == 2);
+    // Freed slots are reused.
+    CHECK(b.cancel(1));
+    CHECK(b.add_limit(3, Side::Buy, 100, 1, ignore).status == Status::Ok);
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {

@@ -12,7 +12,7 @@
 
 namespace ob {
 
-enum class Status : std::uint8_t { Ok, InvalidQty, InvalidId, DuplicateId, PriceOutOfRange };
+enum class Status : std::uint8_t { Ok, InvalidQty, InvalidId, DuplicateId, PriceOutOfRange, BookFull };
 
 struct AddResult {
     Status status;
@@ -46,6 +46,8 @@ public:
         if (id >= by_id_.size()) return {Status::InvalidId, 0, false};
         if (by_id_[id]) return {Status::DuplicateId, 0, false};
         if (!bids_.in_range(price)) return {Status::PriceOutOfRange, 0, false};
+        // Checked up front so an order is never half-filled and then rejected.
+        if (pool_.available() == 0) return {Status::BookFull, 0, false};
         return side == Side::Buy ? add_impl<Side::Buy>(id, price, qty, on_trade)
                                  : add_impl<Side::Sell>(id, price, qty, on_trade);
     }
@@ -103,8 +105,7 @@ private:
         Qty left = match<S>(id, price, qty, on_trade);
         AddResult r{Status::Ok, qty - left, false};
         if (left > 0) {
-            Order* o = pool_.allocate();
-            if (!o) return r;  // pool exhausted: the remainder is dropped
+            Order* o = pool_.allocate();  // cannot fail: checked in add_limit
             o->id = id;
             o->price = price;
             o->qty = left;
