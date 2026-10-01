@@ -230,6 +230,58 @@ void array_ladder_rejects_out_of_band_prices() {
 }
 Registrar reg_band("array_ladder_rejects_out_of_band_prices", array_ladder_rejects_out_of_band_prices);
 
+// Run both books on the same random order flow and require identical trades
+// and identical book state after every operation.
+void differential_array_vs_map() {
+    BookConfig cfg;
+    cfg.max_orders = 1u << 16;
+    cfg.max_order_id = 1u << 18;
+    cfg.ladder = {0, 4096};
+    FastBook fast(cfg);
+    MapBook ref(cfg);
+    std::mt19937_64 rng(42);
+    std::vector<OrderId> ids;
+    Recorder rf, rr;
+    OrderId next = 0;
+    int mismatches = 0;
+
+    for (int i = 0; i < 200'000 && mismatches == 0; ++i) {
+        rf.trades.clear();
+        rr.trades.clear();
+        unsigned kind = rng() % 100;
+        if (kind < 55 || ids.empty()) {
+            Side s = rng() % 2 ? Side::Buy : Side::Sell;
+            auto p = static_cast<Price>(2048 + static_cast<int>(rng() % 41) - 20);
+            auto q = static_cast<Qty>(1 + rng() % 50);
+            OrderId id = next++ % cfg.max_order_id;
+            AddResult a = fast.add_limit(id, s, p, q, rf);
+            AddResult c = ref.add_limit(id, s, p, q, rr);
+            if (a.status != c.status || a.filled != c.filled || a.rested != c.rested) ++mismatches;
+            ids.push_back(id);
+        } else if (kind < 85) {
+            OrderId id = ids[rng() % ids.size()];
+            if (fast.cancel(id) != ref.cancel(id)) ++mismatches;
+        } else if (kind < 95) {
+            OrderId id = ids[rng() % ids.size()];
+            auto q = static_cast<Qty>(rng() % 20);
+            if (fast.reduce(id, q) != ref.reduce(id, q)) ++mismatches;
+        } else {
+            Side s = rng() % 2 ? Side::Buy : Side::Sell;
+            auto q = static_cast<Qty>(1 + rng() % 200);
+            if (fast.add_market(next, s, q, rf) != ref.add_market(next, s, q, rr)) ++mismatches;
+        }
+        if (rf.trades.size() != rr.trades.size()) ++mismatches;
+        for (std::size_t t = 0; t < rf.trades.size() && t < rr.trades.size(); ++t)
+            if (!same_trade(rf.trades[t], rr.trades[t])) ++mismatches;
+        if (fast.best_bid() != ref.best_bid() || fast.best_ask() != ref.best_ask()) ++mismatches;
+        if (fast.order_count() != ref.order_count()) ++mismatches;
+        if (ids.size() > 50'000) ids.erase(ids.begin(), ids.begin() + 25'000);
+        if (mismatches) std::fprintf(stderr, "  first mismatch at op %d\n", i);
+    }
+    CHECK(mismatches == 0);
+}
+Registrar reg_diff("differential_array_vs_map (200k random ops)", differential_array_vs_map);
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
