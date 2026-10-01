@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -36,7 +37,8 @@ public:
     explicit OrderBook(const BookConfig& cfg)
         : bids_(cfg.ladder), asks_(cfg.ladder), pool_(cfg.max_orders), by_id_(cfg.max_order_id, nullptr) {}
 
-    // Rests the order at `price`. Matching comes next, so on_trade isn't called yet.
+    // Match against the opposite side, then rest any remainder at `price`.
+    // on_trade(const Trade&) is called once per fill, in execution order.
     template <class OnTrade>
     AddResult add_limit(OrderId id, Side side, Price price, Qty qty, OnTrade&& on_trade) {
         if (qty == 0) return {Status::InvalidQty, 0, false};
@@ -64,8 +66,7 @@ public:
 private:
     template <Side S, class OnTrade>
     AddResult add_impl(OrderId id, Price price, Qty qty, OnTrade& on_trade) {
-        (void)on_trade;
-        Qty left = qty;
+        Qty left = match<S>(id, price, qty, on_trade);
         AddResult r{Status::Ok, qty - left, false};
         if (left > 0) {
             Order* o = pool_.allocate();
@@ -82,10 +83,54 @@ private:
         return r;
     }
 
+    // Walk the opposite side from the best price while it crosses `limit`,
+    // filling the oldest order at each level first. Returns unfilled qty.
+    template <Side S, class OnTrade>
+    Qty match(OrderId taker, Price limit, Qty qty, OnTrade& on_trade) {
+        auto& book = opposite<S>();
+        while (qty > 0) {
+            PriceLevel* lvl = book.best();
+            if (!lvl || !crosses<S>(limit, lvl->price)) break;
+            while (qty > 0 && lvl->head) {
+                Order* maker = lvl->head;
+                Qty fill = std::min(qty, maker->qty);
+                maker->qty -= fill;
+                lvl->total -= fill;
+                qty -= fill;
+                on_trade(Trade{taker, maker->id, lvl->price, fill});
+                if (maker->qty == 0) {
+                    lvl->erase(maker);
+                    free_order(maker);
+                }
+            }
+            if (lvl->empty()) book.remove(*lvl);
+        }
+        return qty;
+    }
+
+    // A buy crosses asks at or below its limit; a sell crosses bids at or above.
+    template <Side S>
+    static bool crosses(Price limit, Price resting) {
+        if constexpr (S == Side::Buy) return resting <= limit;
+        else return resting >= limit;
+    }
+
     template <Side S>
     auto& own() {
         if constexpr (S == Side::Buy) return bids_;
         else return asks_;
+    }
+
+    template <Side S>
+    auto& opposite() {
+        if constexpr (S == Side::Buy) return asks_;
+        else return bids_;
+    }
+
+    void free_order(Order* o) {
+        by_id_[o->id] = nullptr;
+        --live_count_;
+        pool_.release(o);
     }
 
     template <class L>
