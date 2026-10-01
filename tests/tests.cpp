@@ -121,6 +121,32 @@ BOOK_TEST(trades_at_maker_price) {
     CHECK(r.trades.size() == 1 && r.trades[0].price == 100);
 }
 
+BOOK_TEST(cancel_updates_best) {
+    Book b(small_config());
+    b.add_limit(1, Side::Buy, 100, 10, ignore);
+    b.add_limit(2, Side::Buy, 95, 10, ignore);
+    CHECK(b.cancel(1));
+    CHECK(b.best_bid() == 95);
+    CHECK(!b.cancel(1));    // already gone
+    CHECK(!b.cancel(500));  // never existed
+    CHECK(!b.cancel(5000)); // out of id range
+    CHECK(b.cancel(2));
+    CHECK(!b.best_bid());
+    CHECK(b.order_count() == 0);
+}
+
+BOOK_TEST(cancel_from_middle_of_queue) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    b.add_limit(3, Side::Sell, 100, 10, ignore);
+    CHECK(b.cancel(2));
+    Recorder r;
+    b.add_limit(4, Side::Buy, 100, 30, r);
+    CHECK(r.trades.size() == 2);
+    CHECK(r.trades[0].maker == 1 && r.trades[1].maker == 3);
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
