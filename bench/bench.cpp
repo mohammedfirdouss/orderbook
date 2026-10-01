@@ -1,5 +1,5 @@
 // Replays one synthetic order stream through both books and reports
-// throughput.
+// throughput and per-operation latency percentiles.
 //
 // The stream is generated up front (no RNG inside the timed loop) by driving a
 // reference book, so every cancel targets an order that is really resting.
@@ -130,6 +130,52 @@ double throughput_mops(const std::vector<Op>& ops, const BookConfig& cfg) {
     return static_cast<double>(ops.size()) / secs / 1e6;
 }
 
+struct Percentiles {
+    double p50, p99, p999, max;
+};
+
+Percentiles percentiles(std::vector<std::uint32_t>& v) {
+    if (v.empty()) return {0, 0, 0, 0};
+    std::sort(v.begin(), v.end());
+    auto at = [&](double q) { return static_cast<double>(v[static_cast<std::size_t>(q * static_cast<double>(v.size() - 1))]); };
+    return {at(0.50), at(0.99), at(0.999), static_cast<double>(v.back())};
+}
+
+struct LatencyReport {
+    Percentiles add, cancel, market;
+};
+
+template <class Book>
+LatencyReport latency(const std::vector<Op>& ops, const BookConfig& cfg) {
+    Book book(cfg);
+    std::vector<std::uint32_t> add, cancel, market;
+    add.reserve(ops.size());
+    cancel.reserve(ops.size());
+    market.reserve(ops.size() / 10);
+    std::uint64_t sink = 0;
+    for (const Op& op : ops) {
+        auto t0 = Clock::now();
+        sink += apply(book, op);
+        auto t1 = Clock::now();
+        auto ns = static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
+        (op.type == OpType::Add ? add : op.type == OpType::Cancel ? cancel : market).push_back(ns);
+    }
+    g_sink = sink;
+    return {percentiles(add), percentiles(cancel), percentiles(market)};
+}
+
+// Smallest non-zero step the clock can report.
+double clock_resolution_ns() {
+    double best = 1e9;
+    for (int i = 0; i < 100'000; ++i) {
+        auto a = Clock::now();
+        auto b = Clock::now();
+        while (b == a) b = Clock::now();
+        best = std::min(best, std::chrono::duration<double, std::nano>(b - a).count());
+    }
+    return best;
+}
+
 template <class Book>
 void report(const char* name, const std::vector<Op>& ops, const BookConfig& cfg, int runs) {
     throughput_mops<Book>(ops, cfg);  // warm-up
@@ -137,8 +183,15 @@ void report(const char* name, const std::vector<Op>& ops, const BookConfig& cfg,
     for (int i = 0; i < runs; ++i) mops.push_back(throughput_mops<Book>(ops, cfg));
     std::sort(mops.begin(), mops.end());
     double median = mops[mops.size() / 2];
+    LatencyReport lat = latency<Book>(ops, cfg);
+    auto row = [](const char* what, const Percentiles& p) {
+        std::printf("    %-7s p50 %6.0f   p99 %6.0f   p99.9 %7.0f   max %8.0f ns\n", what, p.p50, p.p99, p.p999, p.max);
+    };
     std::printf("%s\n", name);
     std::printf("    throughput  %.1f M ops/s  (%.1f ns/op, median of %d runs)\n", median, 1e3 / median, runs);
+    row("add", lat.add);
+    row("cancel", lat.cancel);
+    row("market", lat.market);
 }
 
 }  // namespace
@@ -162,7 +215,7 @@ int main(int argc, char** argv) {
                     100.0 * static_cast<double>(markets) / static_cast<double>(n), end_state.order_count(),
                     end_state.level_count(Side::Buy), end_state.level_count(Side::Sell));
     }
-    std::printf("\n");
+    std::printf("clock resolution %.1f ns (per-op latencies below are quantized to this)\n\n", clock_resolution_ns());
 
     report<FastBook>("ArrayLadder (flat price array + bitmap)", ops, cfg, runs);
     report<MapBook>("MapLadder (std::map)", ops, cfg, runs);
