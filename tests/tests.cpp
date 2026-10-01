@@ -52,6 +52,15 @@ BookConfig small_config() {
     return cfg;
 }
 
+struct Recorder {
+    std::vector<Trade> trades;
+    void operator()(const Trade& t) { trades.push_back(t); }
+};
+
+bool same_trade(const Trade& a, const Trade& b) {
+    return a.taker == b.taker && a.maker == b.maker && a.price == b.price && a.qty == b.qty;
+}
+
 auto ignore = [](const Trade&) {};
 
 }  // namespace
@@ -73,6 +82,20 @@ BOOK_TEST(non_crossing_orders_rest) {
     CHECK(b.best_ask() == 101);
     CHECK(b.order_count() == 4);
     CHECK(b.level_count(Side::Buy) == 2);
+}
+
+BOOK_TEST(time_priority_within_a_level) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    Recorder r;
+    AddResult res = b.add_limit(3, Side::Buy, 100, 15, r);
+    CHECK(res.filled == 15 && !res.rested);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 1, 100, 10}));
+    CHECK(same_trade(r.trades[1], {3, 2, 100, 5}));
+    CHECK(!b.contains(1));
+    CHECK(b.volume_at(Side::Sell, 100) == 5);
 }
 
 int main() {
