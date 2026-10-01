@@ -70,7 +70,11 @@ std::vector<Op> generate(std::size_t n, std::uint64_t seed, std::size_t target_l
         if (uni(rng) < 0.05) mid += uni(rng) < 0.5 ? -1 : 1;
         mid = std::clamp(mid, Price{kTicks / 4}, Price{3 * kTicks / 4});
 
-        double add_p = live.size() < target_live ? 0.60 : 0.45;
+        // Below the target depth, adds outnumber cancels so the book fills up;
+        // above it, they balance. Market orders stay at 3% throughout.
+        bool filling = live.size() < target_live;
+        double add_p = filling ? 0.70 : 0.485;
+        double cancel_p = filling ? 0.27 : 0.485;
         double r = uni(rng);
         Side side = uni(rng) < 0.5 ? Side::Buy : Side::Sell;
         filled.clear();
@@ -87,13 +91,13 @@ std::vector<Op> generate(std::size_t n, std::uint64_t seed, std::size_t target_l
                 pos[id] = static_cast<std::uint32_t>(live.size());
                 live.push_back(id);
             }
-        } else if (r < 0.95) {
+        } else if (r < add_p + cancel_p) {
             OrderId id = live[rng() % live.size()];
             ops.push_back({OpType::Cancel, side, id, 0, 0});
             book.cancel(id);
             forget(id);
         } else {
-            Qty qty = static_cast<Qty>(50 + rng() % 450);
+            Qty qty = static_cast<Qty>(10 + rng() % 190);
             ops.push_back({OpType::Market, side, next_id, 0, qty});
             book.add_market(next_id, side, qty, on_trade);
         }
@@ -198,7 +202,7 @@ void report(const char* name, const std::vector<Op>& ops, const BookConfig& cfg,
 
 int main(int argc, char** argv) {
     std::size_t n = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 5'000'000;
-    std::size_t target_live = argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 20'000;
+    std::size_t target_live = argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 10'000;
     int runs = 5;
 
     std::vector<Op> ops = generate(n, 7, target_live);
