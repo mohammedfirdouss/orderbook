@@ -12,7 +12,7 @@ option(OB_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer" 
 
 add_library(orderbook INTERFACE)
 target_include_directories(orderbook INTERFACE include)
-target_compile_options(orderbook INTERFACE -Wall -Wextra -Wpedantic)
+target_compile_options(orderbook INTERFACE -Wall -Wextra -Wpedantic -Wconversion -Werror)
 if(OB_SANITIZE)
   target_compile_options(orderbook INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(orderbook INTERFACE -fsanitize=address,undefined)
