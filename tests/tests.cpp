@@ -98,6 +98,21 @@ BOOK_TEST(time_priority_within_a_level) {
     CHECK(b.volume_at(Side::Sell, 100) == 5);
 }
 
+BOOK_TEST(price_priority_and_remainder_rests) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 101, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    Recorder r;
+    AddResult res = b.add_limit(3, Side::Buy, 101, 25, r);
+    CHECK(res.filled == 20 && res.rested);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 2, 100, 10}));  // better price first
+    CHECK(same_trade(r.trades[1], {3, 1, 101, 10}));
+    CHECK(!b.best_ask());
+    CHECK(b.best_bid() == 101);
+    CHECK(b.volume_at(Side::Buy, 101) == 5);
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
