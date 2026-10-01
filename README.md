@@ -9,6 +9,10 @@ A price-time priority limit order book and matching engine in C++20. It is heade
   - `MapLadder`: a `std::map` keyed by price.
 - **26 tests**, including a differential test that runs both books on 200k random operations and requires identical trades and book state after every operation. The tests also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
+![Terminal demo: 26 tests passing, then both ladders replaying the same 5M orders on a narrow and a wide book](docs/img/demo.gif)
+
+*Tests, then the benchmark on the default book (~170 price levels) and on a wide one (~6,000 levels). Recorded with [vhs](https://github.com/charmbracelet/vhs) from [`docs/demo.tape`](docs/demo.tape).*
+
 ## Results
 
 5M operations (70% add, 27% cancel, 3% market) on a book that holds about 10k resting orders across about 170 price levels. Apple M4 Pro, Apple clang 21, `-O3`. Throughput is the median of 5 runs. I ran the benchmark three times and got the same throughput each time, within 2%.
