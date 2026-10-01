@@ -170,6 +170,21 @@ BOOK_TEST(reduce_rejects_increase_and_zero_cancels) {
     CHECK(!b.best_bid());
 }
 
+BOOK_TEST(market_order_sweeps_levels) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 5, ignore);
+    b.add_limit(2, Side::Sell, 101, 5, ignore);
+    b.add_limit(3, Side::Sell, 105, 5, ignore);
+    Recorder r;
+    CHECK(b.add_market(9, Side::Buy, 12, r) == 12);
+    CHECK(r.trades.size() == 3);
+    CHECK(r.trades[2].price == 105 && r.trades[2].qty == 2);
+    CHECK(b.best_ask() == 105);
+    CHECK(b.add_market(10, Side::Buy, 100, ignore) == 3);  // rest is dropped
+    CHECK(!b.best_ask());
+    CHECK(!b.best_bid());
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
