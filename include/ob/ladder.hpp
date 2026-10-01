@@ -63,7 +63,7 @@ class ArrayLadder {
 
 public:
     explicit ArrayLadder(const LadderConfig& cfg)
-        : min_(cfg.min_price), levels_(cfg.num_ticks) {
+        : min_(cfg.min_price), levels_(cfg.num_ticks), bits_((cfg.num_ticks + 63) / 64, 0) {
         for (std::uint32_t i = 0; i < cfg.num_ticks; ++i) levels_[i].price = min_ + static_cast<Price>(i);
     }
 
@@ -75,6 +75,7 @@ public:
         std::uint32_t i = index(p);
         PriceLevel& lvl = levels_[i];
         if (lvl.empty()) {
+            set_bit(i);
             ++count_;
             if (best_ == kNone || better<S>(p, levels_[best_].price)) best_ = i;
         }
@@ -91,6 +92,7 @@ public:
 
     void remove(PriceLevel& lvl) {
         auto i = static_cast<std::uint32_t>(&lvl - levels_.data());
+        clear_bit(i);
         --count_;
         // Every better price is already empty, so only search the worse side.
         if (i == best_) best_ = next_best(i);
@@ -100,6 +102,8 @@ public:
 
 private:
     std::uint32_t index(Price p) const { return static_cast<std::uint32_t>(p - min_); }
+    void set_bit(std::uint32_t i) { bits_[i / 64] |= 1ull << (i % 64); }
+    void clear_bit(std::uint32_t i) { bits_[i / 64] &= ~(1ull << (i % 64)); }
 
     // Walk away from the old best one tick at a time until a level is non-empty.
     std::uint32_t next_best(std::uint32_t i) const {
@@ -115,6 +119,7 @@ private:
 
     Price min_;
     std::vector<PriceLevel> levels_;
+    std::vector<std::uint64_t> bits_;
     std::uint32_t best_ = kNone;
     std::size_t count_ = 0;
 };
