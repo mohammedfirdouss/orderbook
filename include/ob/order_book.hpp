@@ -49,6 +49,18 @@ public:
                                  : add_impl<Side::Sell>(id, price, qty, on_trade);
     }
 
+    bool cancel(OrderId id) {
+        Order* o = lookup(id);
+        if (!o) return false;
+        PriceLevel* lvl = o->level;
+        lvl->erase(o);
+        if (lvl->empty()) {
+            if (o->side == Side::Buy) bids_.remove(*lvl); else asks_.remove(*lvl);
+        }
+        free_order(o);
+        return true;
+    }
+
     std::optional<Price> best_bid() { return best_of(bids_); }
     std::optional<Price> best_ask() { return best_of(asks_); }
 
@@ -126,6 +138,8 @@ private:
         if constexpr (S == Side::Buy) return asks_;
         else return bids_;
     }
+
+    Order* lookup(OrderId id) { return id < by_id_.size() ? by_id_[id] : nullptr; }
 
     void free_order(Order* o) {
         by_id_[o->id] = nullptr;
