@@ -9,6 +9,19 @@ A price-time priority limit order book and matching engine in C++20. It is heade
   - `MapLadder`: a `std::map` keyed by price.
 - **26 tests**, including a differential test that runs both books on 200k random operations and requires identical trades and book state after every operation. The tests also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
+## Results
+
+5M operations (70% add, 27% cancel, 3% market) on a book that holds about 10k resting orders across about 170 price levels. Apple M4 Pro, Apple clang 21, `-O3`. Throughput is the median of 5 runs. I ran the benchmark three times and got the same throughput each time, within 2%.
+
+| | Throughput | ns/op | market p99 |
+|---|---|---|---|
+| `ArrayLadder` | **~94M ops/s** | **10.7** | 42 ns |
+| `MapLadder` | ~57M ops/s | 17.3 | 84 ns |
+
+**The array ladder is 1.6x faster.** The gap is smaller than you might expect because, with about 170 levels, the whole `std::map` (around 10 KB of nodes) fits in L1 cache, and its O(log L) lookup is only about 7 comparisons. The map also pays one heap allocation every time a new price level appears, and that cost shows up on adds.
+
+**Measurement caveat:** `steady_clock` on Apple Silicon ticks every 41 ns. That's longer than a typical operation, so per-operation p50 can't be measured, and the benchmark reports only throughput and tail percentiles. Max values (10–130 µs) are OS interrupts and vary between runs.
+
 ## Build
 
 ```sh
