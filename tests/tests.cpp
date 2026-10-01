@@ -201,6 +201,27 @@ BOOK_TEST(rejects_bad_input) {
     CHECK(b.add_limit(3, Side::Buy, 100, 1, ignore).status == Status::Ok);
 }
 
+BOOK_TEST(best_price_found_across_bitmap_words) {
+    Book b(small_config());
+    // Prices far apart so the bitmap scan has to cross several 64-bit words.
+    b.add_limit(1, Side::Buy, 5000, 1, ignore);
+    b.add_limit(2, Side::Buy, 200, 1, ignore);
+    b.add_limit(3, Side::Buy, 0, 1, ignore);
+    b.add_limit(4, Side::Sell, 6000, 1, ignore);
+    b.add_limit(5, Side::Sell, 9000, 1, ignore);
+    b.add_limit(6, Side::Sell, 16383, 1, ignore);
+    CHECK(b.cancel(1));
+    CHECK(b.best_bid() == 200);
+    CHECK(b.cancel(2));
+    CHECK(b.best_bid() == 0);
+    CHECK(b.cancel(4));
+    CHECK(b.best_ask() == 9000);
+    CHECK(b.cancel(5));
+    CHECK(b.best_ask() == 16383);
+    CHECK(b.cancel(3) && b.cancel(6));
+    CHECK(!b.best_bid() && !b.best_ask());
+}
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
