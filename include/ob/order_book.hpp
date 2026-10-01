@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -47,6 +48,16 @@ public:
         if (!bids_.in_range(price)) return {Status::PriceOutOfRange, 0, false};
         return side == Side::Buy ? add_impl<Side::Buy>(id, price, qty, on_trade)
                                  : add_impl<Side::Sell>(id, price, qty, on_trade);
+    }
+
+    // Immediate-or-cancel at any price. Unfilled quantity is dropped.
+    template <class OnTrade>
+    Qty add_market(OrderId taker, Side side, Qty qty, OnTrade&& on_trade) {
+        if (qty == 0) return 0;
+        Qty left = side == Side::Buy
+                       ? match<Side::Buy>(taker, std::numeric_limits<Price>::max(), qty, on_trade)
+                       : match<Side::Sell>(taker, std::numeric_limits<Price>::min(), qty, on_trade);
+        return qty - left;
     }
 
     bool cancel(OrderId id) {
