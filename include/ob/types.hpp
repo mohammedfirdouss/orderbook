@@ -50,6 +50,16 @@ struct PriceLevel {
         total += o->qty;
         ++count;
     }
+
+    // O(1) unlink from anywhere in the queue. This is why cancel is O(1).
+    void erase(Order* o) {
+        (o->prev ? o->prev->next : head) = o->next;
+        (o->next ? o->next->prev : tail) = o->prev;
+        total -= o->qty;
+        --count;
+        o->prev = o->next = nullptr;
+        o->level = nullptr;
+    }
 };
 
 }  // namespace ob
