@@ -11,3 +11,9 @@ endif()
 add_library(orderbook INTERFACE)
 target_include_directories(orderbook INTERFACE include)
 target_compile_options(orderbook INTERFACE -Wall -Wextra -Wpedantic)
+
+add_executable(tests tests/tests.cpp)
+target_link_libraries(tests PRIVATE orderbook)
+
+enable_testing()
+add_test(NAME tests COMMAND tests)
