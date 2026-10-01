@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <type_traits>
+#include <vector>
 
 #include "ob/types.hpp"
 
@@ -54,6 +55,68 @@ public:
 
 private:
     std::map<Price, PriceLevel, Cmp> levels_;
+};
+
+template <Side S>
+class ArrayLadder {
+    static constexpr std::uint32_t kNone = UINT32_MAX;
+
+public:
+    explicit ArrayLadder(const LadderConfig& cfg)
+        : min_(cfg.min_price), levels_(cfg.num_ticks) {
+        for (std::uint32_t i = 0; i < cfg.num_ticks; ++i) levels_[i].price = min_ + static_cast<Price>(i);
+    }
+
+    bool in_range(Price p) const {
+        return p >= min_ && static_cast<std::int64_t>(p) - min_ < static_cast<std::int64_t>(levels_.size());
+    }
+
+    PriceLevel& get_or_create(Price p) {
+        std::uint32_t i = index(p);
+        PriceLevel& lvl = levels_[i];
+        if (lvl.empty()) {
+            ++count_;
+            if (best_ == kNone || better<S>(p, levels_[best_].price)) best_ = i;
+        }
+        return lvl;
+    }
+
+    PriceLevel* best() { return best_ == kNone ? nullptr : &levels_[best_]; }
+
+    PriceLevel* find(Price p) {
+        if (!in_range(p)) return nullptr;
+        PriceLevel& lvl = levels_[index(p)];
+        return lvl.empty() ? nullptr : &lvl;
+    }
+
+    void remove(PriceLevel& lvl) {
+        auto i = static_cast<std::uint32_t>(&lvl - levels_.data());
+        --count_;
+        // Every better price is already empty, so only search the worse side.
+        if (i == best_) best_ = next_best(i);
+    }
+
+    std::size_t level_count() const { return count_; }
+
+private:
+    std::uint32_t index(Price p) const { return static_cast<std::uint32_t>(p - min_); }
+
+    // Walk away from the old best one tick at a time until a level is non-empty.
+    std::uint32_t next_best(std::uint32_t i) const {
+        if constexpr (S == Side::Buy) {
+            while (i-- > 0)
+                if (!levels_[i].empty()) return i;
+        } else {
+            for (++i; i < levels_.size(); ++i)
+                if (!levels_[i].empty()) return i;
+        }
+        return kNone;
+    }
+
+    Price min_;
+    std::vector<PriceLevel> levels_;
+    std::uint32_t best_ = kNone;
+    std::size_t count_ = 0;
 };
 
 }  // namespace ob
