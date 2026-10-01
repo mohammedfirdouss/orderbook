@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<style>
+  .bg { fill: #fcfcfb } .ink { fill: #0b0b0b } .ink2 { fill: #52514e }
+  .grid { stroke: #e6e5e0 } .axis { stroke: #b9b8b2 }
+  .s1 { stroke: #2a78d6 } .f1 { fill: #2a78d6 } .s2 { stroke: #eb6834 } .f2 { fill: #eb6834 }
+  .ring { stroke: #fcfcfb }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #1a1a19 } .ink { fill: #ffffff } .ink2 { fill: #c3c2b7 }
+    .grid { stroke: #2e2e2c } .axis { stroke: #55554f }
+    .s1 { stroke: #3987e5 } .f1 { fill: #3987e5 } .s2 { stroke: #d95926 } .f2 { fill: #d95926 }
+    .ring { stroke: #1a1a19 }
+  }
+</style>
+<title id="t">Throughput vs number of price levels</title>
+<desc id="d">Flat array ladder stays near 90 million operations per second up to about 1,100 price levels, while std::map falls from 66 to 17 million. The array is 1.5 times faster at 40 levels and 3.8 times faster at about 6,200 levels.</desc>
+<rect class="bg" width="760" height="420" rx="8"/>
+<text class="ink" x="24" y="30" font-size="17" font-weight="600">Throughput vs book width</text>
+<text class="ink2" x="24" y="52" font-size="13">Same 5M-order replay, ~10k resting orders, spread over more price levels. Median of 5 runs, M4 Pro.</text>
+<line class="grid" x1="64" x2="610" y1="364.0" y2="364.0" stroke-width="1"/>
+<text class="ink2" x="54" y="368.0" font-size="12" text-anchor="end">0</text>
+<line class="grid" x1="64" x2="610" y1="306.8" y2="306.8" stroke-width="1"/>
+<text class="ink2" x="54" y="310.8" font-size="12" text-anchor="end">20</text>
+<line class="grid" x1="64" x2="610" y1="249.6" y2="249.6" stroke-width="1"/>
+<text class="ink2" x="54" y="253.6" font-size="12" text-anchor="end">40</text>
+<line class="grid" x1="64" x2="610" y1="192.4" y2="192.4" stroke-width="1"/>
+<text class="ink2" x="54" y="196.4" font-size="12" text-anchor="end">60</text>
+<line class="grid" x1="64" x2="610" y1="135.2" y2="135.2" stroke-width="1"/>
+<text class="ink2" x="54" y="139.2" font-size="12" text-anchor="end">80</text>
+<line class="grid" x1="64" x2="610" y1="78.0" y2="78.0" stroke-width="1"/>
+<text class="ink2" x="54" y="82.0" font-size="12" text-anchor="end">100</text>
+<text class="ink2" x="20" y="221.0" font-size="12" text-anchor="middle" transform="rotate(-90 20 221.0)">M ops/s</text>
+<line class="axis" x1="64" x2="610" y1="364.0" y2="364.0" stroke-width="1"/>
+<line class="axis" x1="64.0" x2="64.0" y1="364.0" y2="369.0" stroke-width="1"/>
+<text class="ink2" x="64.0" y="384.0" font-size="12" text-anchor="middle">30</text>
+<line class="axis" x1="181.7" x2="181.7" y1="364.0" y2="369.0" stroke-width="1"/>
+<text class="ink2" x="181.7" y="384.0" font-size="12" text-anchor="middle">100</text>
+<line class="axis" x1="289.1" x2="289.1" y1="364.0" y2="369.0" stroke-width="1"/>
+<text class="ink2" x="289.1" y="384.0" font-size="12" text-anchor="middle">300</text>
+<line class="axis" x1="406.7" x2="406.7" y1="364.0" y2="369.0" stroke-width="1"/>
+<text class="ink2" x="406.7" y="384.0" font-size="12" text-anchor="middle">1,000</text>
+<line class="axis" x1="514.1" x2="514.1" y1="364.0" y2="369.0" stroke-width="1"/>
+<text class="ink2" x="514.1" y="384.0" font-size="12" text-anchor="middle">3,000</text>
+<text class="ink2" x="337.0" y="408" font-size="12" text-anchor="middle">Non-empty price levels (log scale)</text>
+<path class="s2" d="M92.1,175.0 L231.8,197.3 L316.0,218.4 L417.3,245.3 L512.5,283.3 L584.4,316.8" fill="none" stroke-width="2" stroke-linejoin="round"/>
+<circle class="f2 ring" cx="92.1" cy="175.0" r="4" stroke-width="2"><title>std::map: 66.1M ops/s at 40 levels (array 1.5x faster)</title></circle>
+<circle class="f2 ring" cx="231.8" cy="197.3" r="4" stroke-width="2"><title>std::map: 58.3M ops/s at 167 levels (array 1.6x faster)</title></circle>
+<circle class="f2 ring" cx="316.0" cy="218.4" r="4" stroke-width="2"><title>std::map: 50.9M ops/s at 395 levels (array 1.9x faster)</title></circle>
+<circle class="f2 ring" cx="417.3" cy="245.3" r="4" stroke-width="2"><title>std::map: 41.5M ops/s at 1,114 levels (array 2.2x faster)</title></circle>
+<circle class="f2 ring" cx="512.5" cy="283.3" r="4" stroke-width="2"><title>std::map: 28.2M ops/s at 2,951 levels (array 2.9x faster)</title></circle>
+<circle class="f2 ring" cx="584.4" cy="316.8" r="4" stroke-width="2"><title>std::map: 16.5M ops/s at 6,156 levels (array 3.8x faster)</title></circle>
+<path class="s1" d="M92.1,82.3 L231.8,96.0 L316.0,92.6 L417.3,99.2 L512.5,126.6 L584.4,184.7" fill="none" stroke-width="2" stroke-linejoin="round"/>
+<circle class="f1 ring" cx="92.1" cy="82.3" r="4" stroke-width="2"><title>Flat array + bitmap: 98.5M ops/s at 40 levels (array 1.5x faster)</title></circle>
+<circle class="f1 ring" cx="231.8" cy="96.0" r="4" stroke-width="2"><title>Flat array + bitmap: 93.7M ops/s at 167 levels (array 1.6x faster)</title></circle>
+<circle class="f1 ring" cx="316.0" cy="92.6" r="4" stroke-width="2"><title>Flat array + bitmap: 94.9M ops/s at 395 levels (array 1.9x faster)</title></circle>
+<circle class="f1 ring" cx="417.3" cy="99.2" r="4" stroke-width="2"><title>Flat array + bitmap: 92.6M ops/s at 1,114 levels (array 2.2x faster)</title></circle>
+<circle class="f1 ring" cx="512.5" cy="126.6" r="4" stroke-width="2"><title>Flat array + bitmap: 83.0M ops/s at 2,951 levels (array 2.9x faster)</title></circle>
+<circle class="f1 ring" cx="584.4" cy="184.7" r="4" stroke-width="2"><title>Flat array + bitmap: 62.7M ops/s at 6,156 levels (array 3.8x faster)</title></circle>
+<rect class="f1" x="596.4" y="179.7" width="10" height="10" rx="2"/>
+<text class="ink" x="612.4" y="188.7" font-size="13">Flat array <tspan class="ink2">63M</tspan></text>
+<rect class="f2" x="596.4" y="311.8" width="10" height="10" rx="2"/>
+<text class="ink" x="612.4" y="320.8" font-size="13">std::map <tspan class="ink2">16M</tspan></text>
+<line class="axis" x1="92.1" x2="92.1" y1="89.3" y2="168.0" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="ink" x="100.1" y="132.6" font-size="13" font-weight="600" text-anchor="start">1.5x</text>
+<line class="axis" x1="584.4" x2="584.4" y1="191.7" y2="309.8" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="ink" x="576.4" y="254.7" font-size="13" font-weight="600" text-anchor="end">3.8x</text>
+<rect class="f1" x="360" y="55" width="10" height="10" rx="2"/>
+<text class="ink2" x="376" y="64" font-size="12">Flat array + bitmap</text>
+<rect class="f2" x="510" y="55" width="10" height="10" rx="2"/>
+<text class="ink2" x="526" y="64" font-size="12">std::map</text>
+</svg>

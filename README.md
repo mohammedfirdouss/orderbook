@@ -18,7 +18,22 @@ A price-time priority limit order book and matching engine in C++20. It is heade
 | `ArrayLadder` | **~94M ops/s** | **10.7** | 42 ns |
 | `MapLadder` | ~57M ops/s | 17.3 | 84 ns |
 
-**The array ladder is 1.6x faster.** The gap is smaller than you might expect because, with about 170 levels, the whole `std::map` (around 10 KB of nodes) fits in L1 cache, and its O(log L) lookup is only about 7 comparisons. The map also pays one heap allocation every time a new price level appears, and that cost shows up on adds.
+**The array ladder is 1.6x faster here, and the gap grows as the book gets wider.** With about 170 levels, the whole `std::map` (around 10 KB of nodes) fits in L1 cache, and a lookup is only about 7 comparisons. Spreading the same ~10k orders over more price levels makes the tree deeper and pushes it out of cache. The array's O(1) indexing barely notices until the levels themselves stop fitting in cache:
+
+![Throughput vs number of price levels: the flat array stays near 90M ops/s up to ~1,100 levels while std::map falls from 66M to 17M; the array is 1.5x faster at 40 levels and 3.8x at ~6,200](docs/img/depth_sweep.svg)
+
+| Price levels | `ArrayLadder` | `MapLadder` | Array faster by |
+|---|---|---|---|
+| 40 | 98.5M ops/s | 66.1M ops/s | 1.5x |
+| 167 | 93.7M | 58.3M | 1.6x |
+| 395 | 94.9M | 50.9M | 1.9x |
+| 1,114 | 92.6M | 41.5M | 2.2x |
+| 2,951 | 83.0M | 28.2M | 2.9x |
+| 6,156 | 62.7M | 16.5M | **3.8x** |
+
+Each row is `./build/bench 5000000 10000 <depth>`, where `<depth>` is the mean distance of new orders from the mid price (2 to 2048 ticks). A second full sweep matched within 2%. Raw data: [`docs/data/depth_sweep.csv`](docs/data/depth_sweep.csv). To regenerate the chart, run `python3 docs/make_chart.py`.
+
+The map also pays one heap allocation every time a new price level appears, and a wide book creates and empties levels far more often.
 
 **Measurement caveat:** `steady_clock` on Apple Silicon ticks every 41 ns. That's longer than a typical operation, so per-operation p50 can't be measured, and the benchmark reports only throughput and tail percentiles. Max values (10–130 µs) are OS interrupts and vary between runs.
 
