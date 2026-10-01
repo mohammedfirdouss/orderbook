@@ -41,12 +41,12 @@ BookConfig make_config(std::size_t num_ops) {
     return cfg;
 }
 
-std::vector<Op> generate(std::size_t n, std::uint64_t seed, std::size_t target_live) {
+std::vector<Op> generate(std::size_t n, std::uint64_t seed, std::size_t target_live, double depth_mean) {
     BookConfig cfg = make_config(n);
     MapBook book(cfg);
     std::mt19937_64 rng(seed);
     std::uniform_real_distribution<double> uni(0.0, 1.0);
-    std::exponential_distribution<double> depth(1.0 / 8.0);  // most orders near the touch
+    std::exponential_distribution<double> depth(1.0 / depth_mean);  // most orders near the touch
 
     std::vector<Op> ops;
     ops.reserve(n);
@@ -203,9 +203,10 @@ void report(const char* name, const std::vector<Op>& ops, const BookConfig& cfg,
 int main(int argc, char** argv) {
     std::size_t n = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 5'000'000;
     std::size_t target_live = argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 10'000;
+    double depth_mean = argc > 3 ? std::strtod(argv[3], nullptr) : 8.0;  // ticks from mid
     int runs = 5;
 
-    std::vector<Op> ops = generate(n, 7, target_live);
+    std::vector<Op> ops = generate(n, 7, target_live, depth_mean);
     BookConfig cfg = make_config(n);
 
     std::size_t adds = 0, cancels = 0, markets = 0;
