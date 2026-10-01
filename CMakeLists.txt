@@ -8,9 +8,15 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+option(OB_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
 add_library(orderbook INTERFACE)
 target_include_directories(orderbook INTERFACE include)
 target_compile_options(orderbook INTERFACE -Wall -Wextra -Wpedantic)
+if(OB_SANITIZE)
+  target_compile_options(orderbook INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer)
+  target_link_options(orderbook INTERFACE -fsanitize=address,undefined)
+endif()
 
 add_executable(tests tests/tests.cpp)
 target_link_libraries(tests PRIVATE orderbook)
