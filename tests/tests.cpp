@@ -222,6 +222,14 @@ BOOK_TEST(best_price_found_across_bitmap_words) {
     CHECK(!b.best_bid() && !b.best_ask());
 }
 
+void array_ladder_rejects_out_of_band_prices() {
+    FastBook b(small_config());
+    CHECK(b.add_limit(1, Side::Buy, -1, 1, ignore).status == Status::PriceOutOfRange);
+    CHECK(b.add_limit(1, Side::Buy, 1 << 14, 1, ignore).status == Status::PriceOutOfRange);
+    CHECK(b.add_limit(1, Side::Buy, (1 << 14) - 1, 1, ignore).status == Status::Ok);
+}
+Registrar reg_band("array_ladder_rejects_out_of_band_prices", array_ladder_rejects_out_of_band_prices);
+
 int main() {
     int failed_tests = 0;
     for (const auto& t : registry()) {
