@@ -189,7 +189,7 @@ void report(const char* name, const std::vector<Op>& ops, const BookConfig& cfg,
     double median = mops[mops.size() / 2];
     LatencyReport lat = latency<Book>(ops, cfg);
     auto row = [](const char* what, const Percentiles& p) {
-        std::printf("    %-7s p50 %6.0f   p99 %6.0f   p99.9 %7.0f   max %8.0f ns\n", what, p.p50, p.p99, p.p999, p.max);
+        std::printf("    %-7s p99 %5.0f   p99.9 %5.0f   max %7.0f ns\n", what, p.p99, p.p999, p.max);
     };
     std::printf("%s\n", name);
     std::printf("    throughput  %.1f M ops/s  (%.1f ns/op, median of %d runs)\n", median, 1e3 / median, runs);
@@ -219,7 +219,8 @@ int main(int argc, char** argv) {
                     100.0 * static_cast<double>(markets) / static_cast<double>(n), end_state.order_count(),
                     end_state.level_count(Side::Buy), end_state.level_count(Side::Sell));
     }
-    std::printf("clock resolution %.1f ns (per-op latencies below are quantized to this)\n\n", clock_resolution_ns());
+    std::printf("clock resolution %.1f ns: per-op latencies are quantized to this, so p50 (below it) is omitted\n\n",
+                clock_resolution_ns());
 
     report<FastBook>("ArrayLadder (flat price array + bitmap)", ops, cfg, runs);
     report<MapBook>("MapLadder (std::map)", ops, cfg, runs);
