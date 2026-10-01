@@ -1,5 +1,18 @@
 #pragma once
 
+// A "ladder" holds one side of the book: every non-empty price level, and
+// which one is best. Two interchangeable implementations:
+//
+//   MapLadder    std::map keyed by price. O(log L) to find a level, and a heap
+//                allocation every time a new price level appears.
+//   ArrayLadder  one slot per tick in a fixed price band, plus a bitmap of
+//                non-empty levels. O(1) to find a level, no allocation, and a
+//                word-at-a-time bitmap scan to find the next best price.
+//
+// Both expose the same interface, so OrderBook takes the ladder as a template
+// parameter and the benchmark can compare them on identical order flow.
+
+#include <bit>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -95,7 +108,7 @@ public:
         clear_bit(i);
         --count_;
         // Every better price is already empty, so only search the worse side.
-        if (i == best_) best_ = next_best(i);
+        if (i == best_) best_ = (S == Side::Buy) ? scan_down(i) : scan_up(i);
     }
 
     std::size_t level_count() const { return count_; }
@@ -105,16 +118,30 @@ private:
     void set_bit(std::uint32_t i) { bits_[i / 64] |= 1ull << (i % 64); }
     void clear_bit(std::uint32_t i) { bits_[i / 64] &= ~(1ull << (i % 64)); }
 
-    // Walk away from the old best one tick at a time until a level is non-empty.
-    std::uint32_t next_best(std::uint32_t i) const {
-        if constexpr (S == Side::Buy) {
-            while (i-- > 0)
-                if (!levels_[i].empty()) return i;
-        } else {
-            for (++i; i < levels_.size(); ++i)
-                if (!levels_[i].empty()) return i;
+    // Highest non-empty index below i, or kNone. Checks 64 levels per step.
+    std::uint32_t scan_down(std::uint32_t i) const {
+        if (i == 0) return kNone;
+        std::uint32_t pos = i - 1;
+        std::size_t w = pos / 64;
+        std::uint64_t word = bits_[w] & (~0ull >> (63 - pos % 64));  // keep bits 0..pos
+        while (true) {
+            if (word) return static_cast<std::uint32_t>(w * 64 + 63 - static_cast<std::size_t>(std::countl_zero(word)));
+            if (w == 0) return kNone;
+            word = bits_[--w];
         }
-        return kNone;
+    }
+
+    // Lowest non-empty index above i, or kNone.
+    std::uint32_t scan_up(std::uint32_t i) const {
+        std::uint32_t pos = i + 1;
+        if (pos >= levels_.size()) return kNone;
+        std::size_t w = pos / 64;
+        std::uint64_t word = bits_[w] & (~0ull << (pos % 64));  // keep bits pos..63
+        while (true) {
+            if (word) return static_cast<std::uint32_t>(w * 64 + static_cast<std::size_t>(std::countr_zero(word)));
+            if (++w == bits_.size()) return kNone;
+            word = bits_[w];
+        }
     }
 
     Price min_;
