@@ -222,11 +222,81 @@ BOOK_TEST(best_price_found_across_bitmap_words) {
     CHECK(!b.best_bid() && !b.best_ask());
 }
 
+BOOK_TEST(modify_price_moves_to_back_of_new_level) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 101, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    AddResult m = b.modify(1, 100, 10, ignore);
+    CHECK(m.status == Status::Ok && m.filled == 0 && m.rested);
+    CHECK(b.volume_at(Side::Sell, 101) == 0);
+    CHECK(b.volume_at(Side::Sell, 100) == 20);
+    Recorder r;
+    b.add_limit(3, Side::Buy, 100, 15, r);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 2, 100, 10}));  // 2 was already there
+    CHECK(same_trade(r.trades[1], {3, 1, 100, 5}));
+}
+
+BOOK_TEST(modify_size_up_loses_priority) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    CHECK(b.modify(1, 100, 20, ignore).status == Status::Ok);
+    CHECK(b.volume_at(Side::Sell, 100) == 30);
+    Recorder r;
+    b.add_limit(3, Side::Buy, 100, 15, r);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 2, 100, 10}));
+    CHECK(same_trade(r.trades[1], {3, 1, 100, 5}));
+}
+
+BOOK_TEST(modify_size_down_keeps_priority) {
+    Book b(small_config());
+    b.add_limit(1, Side::Sell, 100, 10, ignore);
+    b.add_limit(2, Side::Sell, 100, 10, ignore);
+    CHECK(b.modify(1, 100, 3, ignore).status == Status::Ok);
+    CHECK(b.modify(2, 100, 10, ignore).status == Status::Ok);  // no change at all
+    Recorder r;
+    b.add_limit(3, Side::Buy, 100, 5, r);
+    CHECK(r.trades.size() == 2);
+    CHECK(same_trade(r.trades[0], {3, 1, 100, 3}));
+    CHECK(same_trade(r.trades[1], {3, 2, 100, 2}));
+}
+
+BOOK_TEST(modify_to_crossing_price_trades) {
+    Book b(small_config());
+    b.add_limit(1, Side::Buy, 99, 10, ignore);
+    b.add_limit(2, Side::Sell, 101, 4, ignore);
+    Recorder r;
+    AddResult m = b.modify(1, 101, 10, r);
+    CHECK(m.status == Status::Ok && m.filled == 4 && m.rested);
+    CHECK(r.trades.size() == 1 && same_trade(r.trades[0], {1, 2, 101, 4}));
+    CHECK(b.best_bid() == 101);
+    CHECK(b.volume_at(Side::Buy, 101) == 6);
+    CHECK(!b.best_ask());
+}
+
+BOOK_TEST(modify_rejects_bad_input_and_leaves_order_untouched) {
+    Book b(small_config());
+    b.add_limit(1, Side::Buy, 100, 10, ignore);
+    b.add_limit(2, Side::Buy, 100, 10, ignore);
+    CHECK(b.modify(7, 100, 5, ignore).status == Status::UnknownId);
+    CHECK(b.modify(5000, 100, 5, ignore).status == Status::UnknownId);
+    CHECK(b.modify(1, 100, 0, ignore).status == Status::InvalidQty);
+    // Order 1 must still be first in the queue at its original size.
+    Recorder r;
+    b.add_limit(3, Side::Sell, 100, 10, r);
+    CHECK(r.trades.size() == 1 && same_trade(r.trades[0], {3, 1, 100, 10}));
+}
+
 void array_ladder_rejects_out_of_band_prices() {
     FastBook b(small_config());
     CHECK(b.add_limit(1, Side::Buy, -1, 1, ignore).status == Status::PriceOutOfRange);
     CHECK(b.add_limit(1, Side::Buy, 1 << 14, 1, ignore).status == Status::PriceOutOfRange);
     CHECK(b.add_limit(1, Side::Buy, (1 << 14) - 1, 1, ignore).status == Status::Ok);
+    // A modify to an out-of-band price is rejected before the order is cancelled.
+    CHECK(b.modify(1, 1 << 14, 1, ignore).status == Status::PriceOutOfRange);
+    CHECK(b.contains(1) && b.best_bid() == (1 << 14) - 1);
 }
 Registrar reg_band("array_ladder_rejects_out_of_band_prices", array_ladder_rejects_out_of_band_prices);
 
