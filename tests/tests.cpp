@@ -1,5 +1,6 @@
 // Dependency-free test runner. Every BOOK_TEST runs against both ladders.
 
+#include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <random>
@@ -300,8 +301,9 @@ void array_ladder_rejects_out_of_band_prices() {
 }
 Registrar reg_band("array_ladder_rejects_out_of_band_prices", array_ladder_rejects_out_of_band_prices);
 
-// Run both books on the same random order flow and require identical trades
-// and identical book state after every operation.
+// Run both books on the same random order flow (adds, cancels, modifies,
+// reduces and market orders) and require identical trades and identical book
+// state after every operation.
 void differential_array_vs_map() {
     BookConfig cfg;
     cfg.max_orders = 1u << 16;
@@ -328,9 +330,21 @@ void differential_array_vs_map() {
             AddResult c = ref.add_limit(id, s, p, q, rr);
             if (a.status != c.status || a.filled != c.filled || a.rested != c.rested) ++mismatches;
             ids.push_back(id);
-        } else if (kind < 85) {
+        } else if (kind < 75) {
             OrderId id = ids[rng() % ids.size()];
             if (fast.cancel(id) != ref.cancel(id)) ++mismatches;
+        } else if (kind < 85) {
+            // Most remembered ids are long gone (filled or cancelled). Picking
+            // from the 256 most recent and retrying dead ones makes about half
+            // of modifies hit a live order; picking at random managed under 1%.
+            std::size_t recent = std::min<std::size_t>(ids.size(), 256);
+            OrderId id = ids[ids.size() - 1 - rng() % recent];
+            for (int tries = 0; tries < 8 && !ref.contains(id); ++tries) id = ids[ids.size() - 1 - rng() % recent];
+            auto p = static_cast<Price>(2048 + static_cast<int>(rng() % 41) - 20);
+            auto q = static_cast<Qty>(1 + rng() % 50);
+            AddResult a = fast.modify(id, p, q, rf);
+            AddResult c = ref.modify(id, p, q, rr);
+            if (a.status != c.status || a.filled != c.filled || a.rested != c.rested) ++mismatches;
         } else if (kind < 95) {
             OrderId id = ids[rng() % ids.size()];
             auto q = static_cast<Qty>(rng() % 20);
