@@ -2,14 +2,14 @@
 
 A price-time priority limit order book and matching engine in C++20. It is header-only and has no dependencies.
 
-- **Orders:** limit (match, then rest the remainder), market (immediate-or-cancel), cancel, reduce quantity.
+- **Orders:** limit (match, then rest the remainder), market (immediate-or-cancel), cancel, reduce quantity, and modify (price or size; only a size decrease keeps queue priority).
 - **Hot path:** no heap allocation, no virtual calls, no floating point.
 - **Two ladder implementations** behind one template parameter, benchmarked on identical order flow:
   - `ArrayLadder`: a flat array with one slot per price tick, plus a bitmap of non-empty levels.
   - `MapLadder`: a `std::map` keyed by price.
-- **26 tests**, including a differential test that runs both books on 200k random operations and requires identical trades and book state after every operation. The tests also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
+- **36 tests**, including a differential test that runs both books on 200k random operations and requires identical trades and book state after every operation. The tests also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
 
-![Terminal demo: 26 tests passing, then both ladders replaying the same 5M orders on a narrow and a wide book](docs/img/demo.gif)
+![Terminal demo: 36 tests passing, then both ladders replaying the same 5M orders on a narrow and a wide book](docs/img/demo.gif)
 
 *Tests, then the benchmark on the default book (~170 price levels) and on a wide one (~6,000 levels). Recorded with [vhs](https://github.com/charmbracelet/vhs) from [`docs/demo.tape`](docs/demo.tape).*
 
@@ -69,6 +69,7 @@ PriceLevel  head ⇄ order ⇄ order ⇄ tail   (intrusive FIFO = time priority)
 |---|---|---|
 | Add (rests) | O(1) | O(log L) and an allocation if the level is new |
 | Cancel | O(1), plus a bitmap scan if it empties the best level | O(1) unlink, plus O(log L) if the level empties |
+| Modify | Size down: O(1), keeps priority. Otherwise cancel + add | Same, at map costs |
 | Match, per fill | O(1) | O(1), plus O(log L) per emptied level |
 | Best bid/ask | O(1), cached | O(1), `begin()` |
 
