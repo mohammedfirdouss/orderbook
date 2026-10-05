@@ -12,7 +12,7 @@
 
 namespace ob {
 
-enum class Status : std::uint8_t { Ok, InvalidQty, InvalidId, DuplicateId, PriceOutOfRange, BookFull };
+enum class Status : std::uint8_t { Ok, InvalidQty, InvalidId, DuplicateId, PriceOutOfRange, BookFull, UnknownId };
 
 struct AddResult {
     Status status;
@@ -83,6 +83,28 @@ public:
         o->level->total -= o->qty - new_qty;
         o->qty = new_qty;
         return true;
+    }
+
+    // Change an order's price and/or size. Shrinking at the same price keeps
+    // its queue position (via reduce). Any other change is cancel + re-add, so
+    // the order goes to the back of its new level and may trade immediately.
+    //
+    // Everything is validated before the order is touched, so a rejected
+    // modify leaves the original order exactly as it was. Re-adding can't hit
+    // BookFull: cancelling first frees the order's own pool slot.
+    template <class OnTrade>
+    AddResult modify(OrderId id, Price new_price, Qty new_qty, OnTrade&& on_trade) {
+        Order* o = lookup(id);
+        if (!o) return {Status::UnknownId, 0, false};
+        if (new_qty == 0) return {Status::InvalidQty, 0, false};  // removing an order is cancel()
+        if (!bids_.in_range(new_price)) return {Status::PriceOutOfRange, 0, false};
+        if (new_price == o->price && new_qty <= o->qty) {
+            if (new_qty < o->qty) reduce(id, new_qty);
+            return {Status::Ok, 0, true};
+        }
+        Side side = o->side;
+        cancel(id);
+        return add_limit(id, side, new_price, new_qty, on_trade);
     }
 
     std::optional<Price> best_bid() { return best_of(bids_); }
